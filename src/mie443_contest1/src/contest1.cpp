@@ -21,6 +21,10 @@ bool bumperLeft = false, bumperCenter = false, bumperRight = false;
 double posX, posY, yaw;
 double pi = 3.1416;
 
+// Laser Scan
+double laserRange = 10;
+int laserSize = 0, laserOffset = 0, desiredAngle = 10;
+
 void delaySec(double seconds)
 {
 	std::clock_t start;
@@ -54,7 +58,37 @@ void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg)
 
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 {
-	// fill me in
+	laserSize = (msg->angle_max - msg->angle_min)/msg->angle_increment;
+	laserOffset = desiredAngle * pi / (180.0 * msg->angle_increment);
+	laserRange = 11;
+
+	if (desiredAngle * pi / 180.0 < msg->angle_max && -desiredAngle * pi / 180.0 > msg->angle_min)
+	{
+		for (int i = laserSize/2 - laserOffset; i < laserSize/2 + laserOffset; ++i)
+		{
+			if (laserRange > msg->ranges[i])
+			{
+				laserRange = msg->ranges[i];
+			}
+		}
+	}
+	else
+	{
+		for (int i = 0; i < laserSize; ++i)
+		{
+			if (laserRange > msg->ranges[i])
+			{
+				laserRange = msg->ranges[i];
+			}
+		}
+	}
+
+	if (laserRange == 11)
+	{
+		laserRange = 0;
+	}
+
+	ROS_INFO("Size of laser scan array: %i and size of offset: %i", laserSize, laserOffset);
 }
 
 void odomCallback(const nav_msgs::Odometry::ConstPtr& msg)
@@ -63,7 +97,7 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& msg)
 	posY = msg->pose.pose.position.y;
 	yaw = tf::getYaw(msg->pose.pose.orientation);
 
-	ROS_INFO("Position: (%f, %f) Orientation: %f rad or %f degrees.", posX, posY, yaw, yaw*180.0/pi);
+	// ROS_INFO("Position: (%f, %f) Orientation: %f rad or %f degrees.", posX, posY, yaw, yaw*180.0/pi);
 }
 
 bool isBumperPressed()
@@ -103,15 +137,33 @@ int main(int argc, char **argv)
 
 		if (!isBumperPressed())
 		{
-			if (posX < 0.5 && yaw < pi/12)
+			if (posX < 0.5 && yaw < pi/12 && laserRange > 0.7)
 			{
 				angular = 0.0;
 				linear = 0.2;
 			}
-			else if (yaw < pi/2 && posX > 0.5)
+			else if (yaw < pi/2 && posX > 0.5 && laserRange > 0.5)
 			{
 				angular = pi/6;
 				linear = 0.0;
+			}
+			else if (laserRange > 1.0)
+			{
+				if (yaw < 17 * pi / 36 || posX > 0.6)
+				{
+					angular = pi / 12;
+					linear = 0.1;
+				}
+				else if (yaw > 19 * pi / 36)
+				{
+					angular = -pi/12;
+					linear = 0.1;
+				}
+				else
+				{
+					angular = 0.0;
+					linear = 0.1;
+				}
 			}
 		}
 		else
