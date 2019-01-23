@@ -8,37 +8,34 @@
 #include <nav_msgs/Odometry.h>
 #include <tf/transform_datatypes.h>
 
-#include <stdio.h>
+#include <random>
+
 #include <cmath>
-#include <ctime>
+
+#define LIN_SPEED 0.15
 
 using namespace std;
 
+std::random_device rd;
+std::mt19937 gen(rd());
+std::bernoulli_distribution bernoulli(0.4);
+
+bool turnLeft = true;
+
 // CALLBACK VARIABLES
 bool bumperLeft = false, bumperCenter = false, bumperRight = false;
+bool isBumperHit = false;
 
 // Odometry
-double posX, posY, yaw;
+bool isTurning = false;
+double posX, posX_Init;
+double posY, posY_Init; 
+double yaw, yawInitial;
 double pi = 3.1416;
 
 // Laser Scan
 double laserRange = 10;
-int laserSize = 0, laserOffset = 0, desiredAngle = 10;
-
-void delaySec(double seconds)
-{
-	std::clock_t start;
-	double duration = 0.0;
-
-	printf("WAITING");
-
-	while (duration < seconds)
-	{
-		start = std::clock();
-		duration = ( std::clock() - start ) / (double) CLOCKS_PER_SEC;
-	}
-	printf("DONE WAITING");
-}
+int laserSize = 0, laserOffset = 0, desiredAngle = 50;
 
 void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg)
 {
@@ -88,7 +85,8 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 		laserRange = 0;
 	}
 
-	ROS_INFO("Size of laser scan array: %i and size of offset: %i", laserSize, laserOffset);
+	ROS_INFO("Distance Reading: %lf", laserRange);
+	//ROS_INFO("Size of laser scan array: %i and size of offset: %i", laserSize, laserOffset);
 }
 
 void odomCallback(const nav_msgs::Odometry::ConstPtr& msg)
@@ -97,7 +95,13 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& msg)
 	posY = msg->pose.pose.position.y;
 	yaw = tf::getYaw(msg->pose.pose.orientation);
 
-	// ROS_INFO("Position: (%f, %f) Orientation: %f rad or %f degrees.", posX, posY, yaw, yaw*180.0/pi);
+	if (isTurning && std::abs(yaw - yawInitial) > pi / 2.5)
+	{
+		isTurning = false;
+		turnLeft = bernoulli(gen) ? true : false;
+	}
+
+	ROS_INFO("YAW_DIFF: %lf isTurning: %d", std::abs(yaw - yawInitial), isTurning);
 }
 
 bool isBumperPressed()
@@ -133,46 +137,47 @@ int main(int argc, char **argv)
 		//...................................
 
 		angular = 0.0;
-		linear = 0.0;
+		linear = LIN_SPEED;
 
 		if (!isBumperPressed())
 		{
-			if (posX < 0.5 && yaw < pi/12 && laserRange > 0.7)
+			if (laserRange < 0.5 && !isTurning)
 			{
-				angular = 0.0;
-				linear = 0.2;
-			}
-			else if (yaw < pi/2 && posX > 0.5 && laserRange > 0.5)
-			{
-				angular = pi/6;
-				linear = 0.0;
-			}
-			else if (laserRange > 1.0)
-			{
-				if (yaw < 17 * pi / 36 || posX > 0.6)
-				{
-					angular = pi / 12;
-					linear = 0.1;
-				}
-				else if (yaw > 19 * pi / 36)
-				{
-					angular = -pi/12;
-					linear = 0.1;
-				}
-				else
-				{
-					angular = 0.0;
-					linear = 0.1;
-				}
+				yawInitial = yaw;
+				isTurning = true;
 			}
 		}
 		else
 		{
-			angular = 0.0;
+			posX_Init = posX;
+			posY_Init = posY;
+			isBumperHit = true;
+		}
+
+		if (isBumperHit)
+		{
+			if (std::sqrt(std::pow(posX - posX_Init, 2) + std::pow(posY - posY_Init, 2)) < 0.2)
+			{
+				angular = turnLeft ? pi/6 : -pi/6;
+				linear = -LIN_SPEED;
+			}
+			else
+			{
+				isBumperHit = false;
+			}
+		}
+
+		if (isTurning && turnLeft)
+		{
+			angular = pi/6;
+			linear = 0.0;	
+		}
+		else if (isTurning && !turnLeft)
+		{
+			angular = -pi/6;
 			linear = 0.0;
 		}
 		
-
   		vel.angular.z = angular;
   		vel.linear.x = linear;
 
