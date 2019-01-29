@@ -25,12 +25,13 @@ bool turnLeft = true;
 // CALLBACK VARIABLES
 bool bumperLeft = false, bumperCenter = false, bumperRight = false;
 bool isBumperHit = false;
+bool spin = false;
 
 // Odometry
 bool isTurning = false;
-double posX, posX_Init;
-double posY, posY_Init; 
-double yaw, yawInitial;
+double posX, posX_Init = 0.0, posX_Spin = 0.0;
+double posY, posY_Init = 0.0, posY_Spin = 0.0; 
+double yaw, yawInitial, yawDesired;
 double pi = 3.1416;
 
 // Laser Scan
@@ -101,12 +102,23 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& msg)
 		turnLeft = bernoulli(gen) ? true : false;
 	}
 
-	ROS_INFO("YAW_DIFF: %lf isTurning: %d", std::abs(yaw - yawInitial), isTurning);
+	// ROS_INFO("YAW_DIFF: %lf isTurning: %d", std::abs(yaw - yawInitial), isTurning);
+	ROS_INFO("YAW: %lf", yaw);
 }
 
 bool isBumperPressed()
 {
 	return bumperRight || bumperCenter || bumperLeft;
+}
+
+double distFromInit()
+{
+	std::sqrt(std::pow(posX - posX_Init, 2) + std::pow(posY - posY_Init, 2));
+}
+
+double distFromLastSpin()
+{
+	std::sqrt(std::pow(posX - posX_Spin, 2) + std::pow(posY - posY_Spin, 2));
 }
 
 int main(int argc, char **argv)
@@ -146,6 +158,26 @@ int main(int argc, char **argv)
 				yawInitial = yaw;
 				isTurning = true;
 			}
+
+			if (laserRange > 0.5 && lasterRange < 0.7)
+			{
+				linear = 0.8 * LIN_SPEED;	
+			}
+
+			double dist = distFromLastSpin();
+			if (!spin && dist > 1)
+			{
+				ROS_INFO("yawDesired: %lf, yaw: %lf", yawDesired, yaw); 
+				if (yaw < 0)
+				{
+					yawDesired = yaw + 2*pi;
+				}
+				else
+				{
+					yawDesired = yaw;
+				}
+				spin = true;
+			}
 		}
 		else
 		{
@@ -156,7 +188,7 @@ int main(int argc, char **argv)
 
 		if (isBumperHit)
 		{
-			if (std::sqrt(std::pow(posX - posX_Init, 2) + std::pow(posY - posY_Init, 2)) < 0.2)
+			if (distFromInit() < 0.2)
 			{
 				angular = turnLeft ? pi/6 : -pi/6;
 				linear = -LIN_SPEED;
@@ -176,6 +208,26 @@ int main(int argc, char **argv)
 		{
 			angular = -pi/6;
 			linear = 0.0;
+		}
+
+		if (spin)
+		{
+			angular = pi/6;
+			linear = 0.0;
+			
+			// Stop Condition
+			float yawWack = yaw;
+			if (yawWack < 0)
+			{
+				yawWack = 2*pi + yawWack;
+			}
+			//ROS_INFO("lower bound: %lf, yaw: %lf, upper bound: %lf", yawDesired-0.5, yawWack, yawDesired);
+			if (yawWack > yawDesired-pi/18 && yawWack < yawDesired)
+			{
+				spin = false;
+				posX_Spin = posX;
+				posY_Spin = posY;
+			}
 		}
 		
   		vel.angular.z = angular;
