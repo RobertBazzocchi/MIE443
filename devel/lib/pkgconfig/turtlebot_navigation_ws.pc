@@ -1,0 +1,8 @@
+prefix=/home/turtlebot/catkin_ws/devel
+
+Name: turtlebot_navigation_ws
+Description: Description of turtlebot_navigation_ws
+Version: 2.3.7
+Cflags: 
+Libs: -L/home/turtlebot/catkin_ws/devel/lib 
+Requires: 

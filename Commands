@@ -1,0 +1,18 @@
+
+// Initalizes the Turtlebot hardware
+roslaunch turtlebot_bringup minimal.launch
+
+// Begings Mapping software
+roslaunch turtlebot_navigation gmapping_demo.launch
+
+// Opens rviz with appropriate settings to visualize the map
+roslaunch turtlebot_rviz_launchers view_navigation.launch
+
+// Compile source code. Be in catkin workspace
+catkin_make
+
+// Run the program contest 1
+rosrun mie443_contest1 contest1
+
+// Saves gmapping map to current directory with a picture of Andrej's hot mom
+rosrun map_server map_saver -f AndrejsHotMumma.jpeg

@@ -392,6 +392,12 @@ sensor_msgs_DIR:PATH=/opt/ros/kinetic/share/sensor_msgs/cmake
 //The directory containing a CMake configuration file for std_msgs.
 std_msgs_DIR:PATH=/opt/ros/kinetic/share/std_msgs/cmake
 
+//Value Computed by CMake
+turtlebot_navigation_ws_BINARY_DIR:STATIC=/home/turtlebot/catkin_ws/build/turtlebot_navigation_ws
+
+//Value Computed by CMake
+turtlebot_navigation_ws_SOURCE_DIR:STATIC=/home/turtlebot/catkin_ws/src/turtlebot_navigation_ws
+
 //The directory containing a CMake configuration file for xmlrpcpp.
 xmlrpcpp_DIR:PATH=/opt/ros/kinetic/share/xmlrpcpp/cmake
 
