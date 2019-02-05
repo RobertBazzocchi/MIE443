@@ -14,6 +14,13 @@
 #include <iostream>
 #include <chrono>
 
+enum Bumper
+{
+	Left = 0,
+	Center = 1,
+	Right = 2,
+};
+
 #define LIN_SPEED 0.25
 
 using namespace std;
@@ -23,6 +30,8 @@ std::mt19937 gen(rd());
 std::bernoulli_distribution bernoulli(0.7);
 
 bool turnLeft = true;
+
+Bumper whichBumperHit = Center;
 
 // CALLBACK VARIABLES
 bool bumperLeft = false, bumperCenter = false, bumperRight = false;
@@ -39,6 +48,8 @@ double pi = 3.1416;
 // Laser Scan
 double laserRange = 10;
 int laserSize = 0, laserOffset = 0, desiredAngle = 50;
+
+
 
 void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg)
 {
@@ -196,13 +207,38 @@ int main(int argc, char **argv)
 			posX_Init = posX;
 			posY_Init = posY;
 			isBumperHit = true;
+
+			if (bumperRight)
+			{
+				whichBumperHit = Bumper::Right;
+			}
+			else if (bumperLeft)
+			{
+				whichBumperHit = Bumper::Left;
+			}
+			else
+			{
+				whichBumperHit = Bumper::Center;
+			}
+			
 		}
 
 		if (isBumperHit)
 		{
 			if (distFromInit() < 0.2)
 			{
-				angular = turnLeft ? pi/6 : -pi/6;
+				switch(whichBumperHit)
+				{
+					case Bumper::Right:
+						angular = pi/6;
+						break;
+					case Bumper::Left:
+						angular = -pi/6;
+						break;
+					default:
+						angular = turnLeft ? pi/6 : -pi/6;
+				}
+
 				linear = -LIN_SPEED;
 			}
 			else
