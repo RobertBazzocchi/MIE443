@@ -11,14 +11,16 @@
 #include <random>
 
 #include <cmath>
+#include <iostream>
+#include <chrono>
 
-#define LIN_SPEED 0.15
+#define LIN_SPEED 0.25
 
 using namespace std;
 
 std::random_device rd;
 std::mt19937 gen(rd());
-std::bernoulli_distribution bernoulli(0.4);
+std::bernoulli_distribution bernoulli(0.7);
 
 bool turnLeft = true;
 
@@ -139,7 +141,11 @@ int main(int argc, char **argv)
 	
 	double linear = 0.0;
 	double angular = 0.0;
-	while(ros::ok())
+
+	std::chrono::time_point<std::chrono::system_clock> start;
+	start = std::chrono::system_clock::now(); /* start timer */
+    	uint64_t secondsElapsed = 0; // the timer just started, so we know it is less than 480, no need to check.
+	while(ros::ok() && secondsElapsed <= 480)
 	{
 		// UPDATE VALUES IN CALLBACK SUBSCRIPTION
 		ros::spinOnce();	
@@ -165,7 +171,7 @@ int main(int argc, char **argv)
 			}
 
 			double dist = distFromLastSpin();
-			if (!spin && dist > 0.6)
+			if (!spin && dist > 1.5)
 			{
 				ROS_INFO("yawDesired: %lf, yaw: %lf", yawDesired, yaw); 
 				if (yaw < 0)
@@ -175,6 +181,12 @@ int main(int argc, char **argv)
 				else
 				{
 					yawDesired = yaw;
+				}
+
+				//yawDesired -= pi/4;
+				if (yawDesired < 0)
+				{
+					yawDesired += 2*pi;
 				}
 				spin = true;
 			}
@@ -234,6 +246,9 @@ int main(int argc, char **argv)
   		vel.linear.x = linear;
 
   		vel_pub.publish(vel);
+
+		// The last thing to do is to update the timer.
+		secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now()-start).count();
 	}
 
 	return 0;
