@@ -182,7 +182,7 @@ int main(int argc, char **argv)
 			}
 
 			double dist = distFromLastSpin();
-			if (!spin && dist > 1.5)
+			if (!spin && dist > 0.6)
 			{
 				ROS_INFO("yawDesired: %lf, yaw: %lf", yawDesired, yaw); 
 				if (yaw < 0)
