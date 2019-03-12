@@ -52,7 +52,7 @@ int ImagePipeline::getTemplateID(Boxes& boxes) {
         cv::imshow("view", img);
         cv::waitKey(10);
 
-        int minHessian = 400;
+        int minHessian = 600;
         Ptr<SURF> detector = SURF::create(minHessian);
         FlannBasedMatcher matcher;
 
@@ -76,28 +76,10 @@ int ImagePipeline::getTemplateID(Boxes& boxes) {
             std::vector<DMatch> matches;
             matcher.match(descriptors_object, descriptors_scene, matches);
 
-            printf("Number of matches: %d \n", static_cast<int>(matches.size()));
-
-            double max_dist = 0.0, min_dist = 100.0;
-            for (size_t i = 0; i < matches.size(); ++i)
-            {
-                double dist = matches[i].distance;
-                min_dist = std::min(min_dist, dist);
-                max_dist = std::max(max_dist, dist);
-            }
-
-            printf("Min Dist: %lf \n", min_dist);
-            printf("Max Dist: %lf \n", max_dist);
-
-            if (min_dist > 0.25)
-            {
-                break;
-            }
-
             unsigned numGoodMatches = 0;
             for (size_t i = 0; i < matches.size(); ++i)
             {
-                if (matches[i].distance < 1.5 * min_dist)
+                if (matches[i].distance < 0.2)
                 {
                     ++numGoodMatches;
                 }
@@ -117,7 +99,7 @@ int ImagePipeline::getTemplateID(Boxes& boxes) {
             }
         }
 
-        if (maxMatches < 10)
+        if (maxMatches < 30)
         {
             template_id = -1;
         }

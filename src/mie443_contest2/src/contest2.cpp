@@ -7,6 +7,56 @@
 
 #include <fstream>
 
+struct pose
+{
+    float x;
+    float y;
+    float phi;
+};
+
+float euclideanDistance(pose currentCoord, pose nextCoord)
+{
+    float dist = sqrt( pow(currentCoord.x-nextCoord.x,2)+ pow(currentCoord.y-nextCoord.y,2));
+    float angleDiff = abs(currentCoord.phi - fmod(nextCoord.phi + 3.14, 6.28));
+    float totalCost = dist + 0.7*angleDiff;
+    return totalCost;
+}
+
+std::vector<pose> getBinOrder(RobotPose startingRobotPose, Boxes boxes)
+{
+    std::vector<pose> orderedCoords;
+    std::vector<pose> remainingCoords;
+
+    for (auto& coord : boxes.coords)
+    {
+        remainingCoords.push_back({coord[0], coord[1], coord[2]});
+    }
+    
+    orderedCoords.push_back({startingRobotPose.x,startingRobotPose.y,startingRobotPose.phi});   
+    while(orderedCoords.size() < boxes.coords.size() + 1) 
+    {
+        float minDist = 1000; 
+        int targetIndex = 0;
+        pose currentCoord = orderedCoords.back();
+        for(int i = 0; i < remainingCoords.size(); ++i) 
+        {
+            float dist = euclideanDistance(currentCoord, remainingCoords[i]);
+            if (dist < minDist)
+            {
+                minDist = dist;
+                targetIndex = i;
+            }            
+        }
+
+        orderedCoords.push_back(remainingCoords[targetIndex]);
+        remainingCoords.erase(remainingCoords.begin() + targetIndex);
+    }
+    
+    orderedCoords.push_back({startingRobotPose.x,startingRobotPose.y,startingRobotPose.phi});
+    orderedCoords.erase(orderedCoords.begin());
+    return orderedCoords;
+}
+
 int main(int argc, char** argv) {
     // Setup ROS.
     ros::init(argc, argv, "contest2");
@@ -40,7 +90,7 @@ int main(int argc, char** argv) {
     // Initalize which box is currently being navigated to
     unsigned boxInd = 0;  
 
-    std::ifstream BoxIDs("BoxIDs.txt");
+    std::ofstream BoxIDs("BoxIDs.txt");
 
     // Make sure initalization completes
     for (auto i = 0; i < 30; ++i)
@@ -49,6 +99,20 @@ int main(int argc, char** argv) {
         ros::Duration(0.01).sleep();
     }
 
+    // Get Localization initalized
+    for (auto i = 0; i < 5; ++i)
+    {
+        ros::spinOnce();
+        if (!navigator.moveToGoal(robotPose.x + 0.01, robotPose.y, robotPose.phi))
+        {
+            return -1;
+        }
+    }
+
+    // Get box order to follow and current box
+    auto boxOrder = getBinOrder(robotPose, boxes);
+    auto currBox = boxOrder.begin();
+
     // Execute strategy.
     while(ros::ok()) 
     {
@@ -56,29 +120,32 @@ int main(int argc, char** argv) {
         // Use: boxes.coords
         // Use: robotPose.x, robotPose.y, robotPose.phi
 
-        // float phi = boxes.coords[boxInd][2];
-        // float x = boxes.coords[boxInd][0] + 0.7*std::cos(phi);
-        // float y = boxes.coords[boxInd][1] + 0.7*std::sin(phi);
-        // phi = fmod(phi + 3.14, 6.28);
+        float phi = currBox->phi;
+        float x = currBox->x + 0.7*std::cos(phi);
+        float y = currBox->y + 0.7*std::sin(phi);
+        phi = fmod(phi + 3.14, 6.28);
 
-        // if (!navigator.moveToGoal(x, y, phi))
-        // {
-        //     return -1;
-        // }
+        if (!navigator.moveToGoal(x, y, phi))
+        {
+            return -1;
+        }
 
-        // ++boxInd;
+        // Check stop condition
+        if (currBox == boxOrder.end())
+        {
+            std::cout << "Found all boxes" << std::endl;
+            return 0;
+        }
+        else
+        {
+             // Get template ID and write to file
+            auto templateID = imagePipeline.getTemplateID(boxes);
+            BoxIDs << templateID << std::endl;
 
-        auto templateID = imagePipeline.getTemplateID(boxes);
-        ROS_INFO("Got Template ID");
-        printf("Image Index: %d \n", templateID);
-        ros::Duration(0.01).sleep();
-
-        // // Check stop condition
-        // if (boxInd > static_cast<int>(boxes.coords.size()))
-        // {
-        //     std::cout << "Found all boxes" << std::endl;
-        //     return 0;
-        // }
+            ++currBox;
+            ros::Duration(0.01).sleep();
+        }
+        
     }
     return 0;
 }
