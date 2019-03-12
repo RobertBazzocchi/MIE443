@@ -84,12 +84,13 @@ int main(int argc, char** argv) {
     // Initialize image objectand subscriber.
     ImagePipeline imagePipeline(n);
 
+    // Initialize box template features
+    imagePipeline.populateTemplates(boxes);
+
     // Initalize navigator
     Navigation navigator;
 
-    // Initalize which box is currently being navigated to
-    unsigned boxInd = 0;  
-
+    // Initalize file to write image IDs to
     std::ofstream BoxIDs("BoxIDs.txt");
 
     // Make sure initalization completes
@@ -108,6 +109,9 @@ int main(int argc, char** argv) {
             return -1;
         }
     }
+
+    // Adjust for moving forward
+    robotPose.x -= 5 * 0.01;
 
     // Get box order to follow and current box
     auto boxOrder = getBinOrder(robotPose, boxes);

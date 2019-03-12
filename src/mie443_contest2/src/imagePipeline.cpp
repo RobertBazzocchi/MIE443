@@ -1,11 +1,5 @@
 #include <imagePipeline.h>
 
-// OPENCV
-#include "opencv2/highgui.hpp"
-#include "opencv2/calib3d.hpp"
-#include "opencv2/xfeatures2d.hpp"
-#include "opencv2/imgproc.hpp"
-
 #define IMAGE_TYPE sensor_msgs::image_encodings::BGR8
 #define IMAGE_TOPIC "camera/image" // kinect:"camera/rgb/image_raw" webcam:"camera/image"
 
@@ -32,6 +26,17 @@ void ImagePipeline::imageCallback(const sensor_msgs::ImageConstPtr& msg) {
     }    
 }
 
+void ImagePipeline::populateTemplates(Boxes& boxes)
+{
+    // Go through each box and match
+    for (auto& box : boxes.templates)
+    {
+        ImageFeatures features;
+        detector->detectAndCompute(box, Mat(), features.keypoints, features.descriptors);
+        vTemplates.emplace_back(features);
+    }
+}
+
 int ImagePipeline::getTemplateID(Boxes& boxes) {
     int template_id = -1;
     if(!isValid) 
@@ -47,34 +52,22 @@ int ImagePipeline::getTemplateID(Boxes& boxes) {
     } 
     else 
     {
-        /***YOUR CODE HERE***/
-        // Use: boxes.templates
         cv::imshow("view", img);
         cv::waitKey(10);
+        
+        ImageFeatures sceneFeatures;
+        detector->detectAndCompute(img, Mat(), sceneFeatures.keypoints, sceneFeatures.descriptors);
 
-        int minHessian = 600;
-        Ptr<SURF> detector = SURF::create(minHessian);
-        FlannBasedMatcher matcher;
-
-        std::vector<KeyPoint> keypoints_object;
-        Mat descriptors_object;
-
-        detector->detectAndCompute(img, Mat(), keypoints_object, descriptors_object);
-
-        std::vector<size_t> numMatches(boxes.templates.size(), 0);
+        std::vector<size_t> numMatches(vTemplates.size(), 0);
 
         // Go through each box and match
-        for (size_t boxInd = 0; boxInd < boxes.templates.size(); ++boxInd)
+        for (size_t boxInd = 0; boxInd < vTemplates.size(); ++boxInd)
         {
-            auto& boxTemplate = boxes.templates[boxInd];
-
-            Mat descriptors_scene;
-            std::vector<KeyPoint> keypoints_scene;
-            detector->detectAndCompute(boxTemplate, Mat(), keypoints_scene, descriptors_scene);
+            auto& templateFeatures = vTemplates[boxInd];
             
             // Feature Matching
             std::vector<DMatch> matches;
-            matcher.match(descriptors_object, descriptors_scene, matches);
+            matcher.match(templateFeatures.descriptors, sceneFeatures.descriptors, matches);
 
             unsigned numGoodMatches = 0;
             for (size_t i = 0; i < matches.size(); ++i)
